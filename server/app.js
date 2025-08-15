@@ -28,7 +28,6 @@ mongoose
     errorMessage("Error connection to MongoDB", error.message);
   });
 
-app.use(express.static("dist"));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -51,6 +50,11 @@ app.use("/uploads", express.static(__dirname + "/uploads"));
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/posts", postRoutes);
+
+app.use(express.static(path.resolve(__dirname, "dist")));
+app.get("/*path", (req, res) => {
+  res.sendFile(path.resolve(__dirname, "dist", "index.html"));
+});
 
 app.use(unknownEndpoint);
 app.use(errorHandler);
