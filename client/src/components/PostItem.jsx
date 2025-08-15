@@ -29,13 +29,7 @@ const PostItem = ({
           className="flex items-center justify-center gap-4 min-w-0 text-[#252542] hover:text-[#548EAA] transition-colors duration-300 ease-in-out"
         >
           <img
-            src={
-              user.avatar
-                ? `${import.meta.env.VITE_ASSETS_URL}/uploads/avatar/${
-                    user.avatar
-                  }`
-                : noAvatar
-            }
+            src={user.avatar ? `/uploads/avatar/${user.avatar}` : noAvatar}
             alt={user.name}
             className="w-10 h-10 rounded-full object-cover flex-shrink-0"
           />
@@ -73,9 +67,7 @@ const PostItem = ({
       <div className="my-5 h-65">
         <img
           className="w-full h-full object-cover"
-          src={`${
-            import.meta.env.VITE_ASSETS_URL
-          }/uploads/thumbnail/${thumbnail}`}
+          src={`/uploads/thumbnail/${thumbnail}`}
           alt={title}
         />
       </div>

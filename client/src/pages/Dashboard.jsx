@@ -45,9 +45,7 @@ const Dashboard = () => {
             return (
               <div key={id} className="p-4 bg-white rounded shadow-lg">
                 <img
-                  src={`${
-                    import.meta.env.VITE_ASSETS_URL
-                  }/uploads/thumbnail/${thumbnail}`}
+                  src={`/uploads/thumbnail/${thumbnail}`}
                   alt={title}
                   className="rounded"
                 />

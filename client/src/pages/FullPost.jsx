@@ -61,9 +61,7 @@ const FullPost = () => {
                   <img
                     src={
                       post.user.avatar
-                        ? `${import.meta.env.VITE_ASSETS_URL}/uploads/avatar/${
-                            post.user.avatar
-                          }`
+                        ? `/uploads/avatar/${post.user.avatar}`
                         : noAvatar
                     }
                     alt={post.user.username}
@@ -99,9 +97,7 @@ const FullPost = () => {
 
             {/* Post thumbnail*/}
             <img
-              src={`${import.meta.env.VITE_ASSETS_URL}/uploads/thumbnail/${
-                post.thumbnail
-              }`}
+              src={`/uploads/thumbnail/${post.thumbnail}`}
               alt="Blog thumbnail"
               className="my-10 mx-auto"
             />

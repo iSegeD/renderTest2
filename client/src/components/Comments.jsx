@@ -79,9 +79,7 @@ const Comments = ({ post }) => {
                 <img
                   src={
                     item.user.avatar
-                      ? `${import.meta.env.VITE_ASSETS_URL}/uploads/avatar/${
-                          item.user.avatar
-                        }`
+                      ? `/uploads/avatar/${item.user.avatar}`
                       : noAvatar
                   }
                   alt={item.user.username}

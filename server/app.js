@@ -1,5 +1,4 @@
 import express from "express";
-import cors from "cors";
 import cookieParser from "cookie-parser";
 import mongoose from "mongoose";
 import { MONGODB_URI } from "./config/serverConfig.js";
@@ -31,17 +30,6 @@ mongoose
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-if (process.env.NODE_ENV === "development") {
-  app.use(
-    cors({
-      origin: "http://localhost:5173",
-      credentials: true,
-      methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
-    })
-  );
-}
 
 app.use(tokenExtractor);
 
