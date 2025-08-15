@@ -1,0 +1,317 @@
+import Post from "../models/postModel.js";
+import User from "../models/userModel.js";
+
+import { httpError } from "../utils/httpErrorHelper.js";
+
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ================== GET ALL POST ==================
+// GET : api/posts
+// UNPROTECTED
+const getPosts = async (req, res) => {
+  const posts = await Post.find({})
+    .sort({ createdAt: -1 })
+    .populate("user", { username: 1, avatar: 1 });
+  res.status(200).json(posts);
+};
+
+// ================== GET SINGLE POST ==================
+// GET : api/posts/:id
+// UNPROTECTED
+const getPost = async (req, res) => {
+  const selectedPost = await Post.findByIdAndUpdate(
+    req.params.id,
+    { $inc: { viewsCount: 1 } },
+    { new: true }
+  )
+    .populate("user", { username: 1, avatar: 1 })
+    .populate("comments.user", { username: 1, avatar: 1 })
+    .lean();
+
+  if (!selectedPost) {
+    httpError("Post not found", 404);
+  }
+
+  selectedPost.comments.sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+
+  res.status(200).json(selectedPost);
+};
+
+// ================== GET SINGLE POST FOR EDIT ==================
+// GET : api/posts/:id/edit
+// UNPROTECTED
+const getPostForEdit = async (req, res) => {
+  const selectedPost = await Post.findById(req.params.id);
+
+  if (!selectedPost) {
+    httpError("Post not found", 404);
+  }
+
+  res.status(200).json(selectedPost);
+};
+
+// ================== GET USER POST ==================
+// GET : api/posts/users/:id
+// UNPROTECTED
+const getUserPosts = async (req, res) => {
+  const posts = await Post.find({ user: req.params.id })
+    .sort({
+      createdAt: -1,
+    })
+    .populate("user", { username: 1, avatar: 1 });
+  res.status(200).json(posts);
+};
+
+// ================== GET POSTS BY TAG ==================
+// GET : api/posts/tags/:tag
+// UNPROTECTED
+const getTagPost = async (req, res) => {
+  const { tag } = req.params;
+  const posts = await Post.find({ tags: { $in: [tag] } })
+    .sort({
+      createdAt: -1,
+    })
+    .populate("user", { username: 1, avatar: 1 });
+
+  res.status(200).json(posts);
+};
+
+// ================== CREATE POST ==================
+// POST : api/posts
+// PROTECTED
+const createPost = async (req, res) => {
+  const { title, desc, tags } = req.body;
+  const file = req.file;
+
+  if (!file) {
+    httpError("Please upload a post thumbnail", 400);
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    httpError("Thumbnail too large. Maximum allowed size is 2MB", 400);
+  }
+
+  const fileName = uuidv4() + path.extname(file.originalname);
+  const filePath = path.join(__dirname, "..", "uploads/thumbnail", fileName);
+
+  await fs.writeFile(filePath, file.buffer);
+
+  const newPost = await Post.create({
+    title,
+    desc,
+    thumbnail: fileName,
+    tags: tags?.split(",").map((item) => item.trim()),
+    user: req.userId,
+  });
+
+  await User.findByIdAndUpdate(
+    req.userId,
+    { $push: { posts: newPost._id } },
+    { new: true }
+  );
+
+  const populatedPost = await Post.findById(newPost._id).populate("user", {
+    username: 1,
+    avatar: 1,
+  });
+
+  res.status(201).json(populatedPost);
+};
+
+// ================== EDIT POST ==================
+// PATCH : api/posts/:id
+// PROTECTED
+const editPost = async (req, res) => {
+  const { title, desc, tags } = req.body;
+  const file = req.file;
+
+  const post = await Post.findById(req.params.id);
+
+  if (!post) {
+    httpError("Post not found", 404);
+  } else if (post.user.toString() !== req.userId) {
+    httpError("You have no authorization to update this post", 401);
+  }
+
+  const updatedFields = {};
+
+  if (title) {
+    updatedFields.title = title;
+  }
+
+  if (desc) {
+    updatedFields.desc = desc;
+  }
+
+  if (tags) {
+    updatedFields.tags = Array.isArray(tags)
+      ? tags.map((tag) => tag.trim())
+      : tags.split(",").map((tag) => tag.trim());
+  }
+
+  if (file) {
+    if (file.size > 2 * 1024 * 1024) {
+      httpError("Thumbnail is too large. Maximum allowed size is 2MB", 400);
+    }
+
+    if (post.thumbnail) {
+      const oldPath = path.join(
+        __dirname,
+        "..",
+        "uploads/thumbnail",
+        post.thumbnail
+      );
+
+      try {
+        await fs.unlink(oldPath);
+      } catch (err) {
+        if (err.code === "ENOENT") {
+          console.warn(
+            "The file was manually deleted, but the express won't go down"
+          );
+        } else {
+          httpError("Failed to update thumbnail", 400);
+        }
+      }
+
+      const fileName = uuidv4() + path.extname(file.originalname);
+      const filePath = path.join(
+        __dirname,
+        "..",
+        "uploads/thumbnail",
+        fileName
+      );
+
+      await fs.writeFile(filePath, file.buffer);
+
+      updatedFields.thumbnail = fileName;
+    }
+  }
+
+  const updatedPost = await Post.findByIdAndUpdate(
+    req.params.id,
+    updatedFields,
+    { new: true }
+  ).populate("user", { username: 1, avatar: 1 });
+
+  res.status(200).json(updatedPost);
+};
+
+// ================== DELETE POST ==================
+// DELETE : api/posts/:id
+// PROTECTED
+const deletePost = async (req, res) => {
+  const postToDelete = await Post.findById(req.params.id);
+
+  if (!postToDelete) {
+    httpError("Post not found", 404);
+  } else if (postToDelete.user.toString() !== req.userId) {
+    httpError("You have no authorization to delete this post", 401);
+  }
+
+  if (postToDelete.thumbnail) {
+    const filePath = path.join(
+      __dirname,
+      "..",
+      "uploads/thumbnail",
+      postToDelete.thumbnail
+    );
+    try {
+      await fs.unlink(filePath);
+    } catch (err) {
+      if (err.code !== "ENOENT") {
+        httpError("Failed to delete post thumbnail", 400);
+      }
+    }
+  }
+
+  await Post.findByIdAndDelete(req.params.id);
+  await User.findByIdAndUpdate(
+    req.userId,
+    { $pull: { posts: req.params.id } },
+    { new: true }
+  );
+
+  res.status(204).end();
+};
+
+// ================== ADD COMMENT ==================
+// PATCH : api/posts/:id/comments
+// PROTECTED
+const addComment = async (req, res) => {
+  const { comment } = req.body;
+
+  const post = await Post.findById(req.params.id);
+
+  if (!post) {
+    return httpError("Post not found", 404);
+  }
+
+  post.comments.push({
+    text: comment,
+    user: req.userId,
+    createdAt: new Date(),
+  });
+
+  await post.save();
+
+  const populatedPost = await Post.findById(req.params.id)
+    .populate("comments.user", { username: 1, avatar: 1 })
+    .lean();
+
+  populatedPost.comments.sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+
+  res.status(201).json(populatedPost);
+};
+
+// ================== DELETE COMMENT ==================
+// DELETE : api/posts/:id/comments/:commentId
+// PROTECTED
+const deleteComment = async (req, res) => {
+  const { id, commentId } = req.params;
+
+  const post = await Post.findOne({ _id: id, "comments._id": commentId });
+
+  if (!post) {
+    httpError("Post or comment not found", 404);
+  }
+
+  const comment = post.comments.id(commentId);
+  if (comment.user.toString() !== req.userId) {
+    httpError("You have no authorization to delete this comment", 401);
+  }
+
+  await Post.findByIdAndUpdate(id, { $pull: { comments: { _id: commentId } } });
+
+  const populatedPost = await Post.findById(id)
+    .populate("comments.user", { username: 1, avatar: 1 })
+    .lean();
+
+  populatedPost.comments.sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+
+  res.status(201).json(populatedPost);
+};
+
+export {
+  createPost,
+  getPost,
+  getPosts,
+  getPostForEdit,
+  getTagPost,
+  getUserPosts,
+  editPost,
+  deletePost,
+  addComment,
+  deleteComment,
+};
