@@ -118,9 +118,7 @@ const UserProfile = () => {
                 newAvatar
                   ? URL.createObjectURL(newAvatar)
                   : avatarFromServer
-                  ? `${
-                      import.meta.env.VITE_ASSETS_URL
-                    }/uploads/avatar/${avatarFromServer}`
+                  ? `/uploads/avatar/${avatarFromServer}`
                   : noAvatar
               }
               alt={currentUser.name}
