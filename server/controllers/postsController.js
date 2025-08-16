@@ -3,12 +3,12 @@ import User from "../models/userModel.js";
 
 import { httpError } from "../utils/httpErrorHelper.js";
 
+import { thumbnailsBucket } from "../config/googleStorage.js";
+import sharp from "sharp";
+
+const MAX_THUMBNAIL_SIZE = 2 * 1024 * 1024;
+
 import { v4 as uuidv4 } from "uuid";
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // ================== GET ALL POST ==================
 // GET : api/posts
@@ -87,26 +87,35 @@ const getTagPost = async (req, res) => {
 // POST : api/posts
 // PROTECTED
 const createPost = async (req, res) => {
-  const { title, desc, tags } = req.body;
   const file = req.file;
+  const { title, desc, tags } = req.body;
 
   if (!file) {
     httpError("Please upload a post thumbnail", 400);
   }
 
-  if (file.size > 2 * 1024 * 1024) {
-    httpError("Thumbnail too large. Maximum allowed size is 2MB", 400);
+  const buffer = await sharp(file.buffer).jpeg({ quality: 90 }).toBuffer();
+
+  if (buffer.length > MAX_THUMBNAIL_SIZE) {
+    httpError("Post thumbnail is too large after processing (max 2MB)", 400);
   }
 
-  const fileName = uuidv4() + path.extname(file.originalname);
-  const filePath = path.join(__dirname, "..", "uploads/thumbnail", fileName);
+  const ext = "jpeg";
+  const fileName = `${uuidv4()}.${ext}`;
 
-  await fs.writeFile(filePath, file.buffer);
+  const gcsFile = thumbnailsBucket.file(fileName);
+
+  await gcsFile.save(buffer, {
+    contentType: "image/jpeg",
+    resumable: false,
+  });
+
+  const publicUrl = `https://storage.googleapis.com/${thumbnailsBucket.name}/${gcsFile.name}`;
 
   const newPost = await Post.create({
     title,
     desc,
-    thumbnail: fileName,
+    thumbnail: publicUrl,
     tags: tags?.split(",").map((item) => item.trim()),
     user: req.userId,
   });
@@ -157,42 +166,37 @@ const editPost = async (req, res) => {
   }
 
   if (file) {
-    if (file.size > 2 * 1024 * 1024) {
-      httpError("Thumbnail is too large. Maximum allowed size is 2MB", 400);
+    const buffer = await sharp(file.buffer).jpeg({ quality: 90 }).toBuffer();
+
+    if (buffer.length > MAX_THUMBNAIL_SIZE) {
+      httpError("Post thumbnail is too large after processing (max 2MB)", 400);
     }
 
     if (post.thumbnail) {
-      const oldPath = path.join(
-        __dirname,
-        "..",
-        "uploads/thumbnail",
-        post.thumbnail
-      );
+      const fileName = post.thumbnail.split("/").pop();
+      const oldFile = thumbnailsBucket.file(fileName);
 
       try {
-        await fs.unlink(oldPath);
-      } catch (err) {
-        if (err.code === "ENOENT") {
-          console.warn(
-            "The file was manually deleted, but the express won't go down"
-          );
-        } else {
-          httpError("Failed to update thumbnail", 400);
+        await oldFile.delete();
+      } catch (error) {
+        if (error.code !== 404) {
+          httpError("Failed to delete old thumbnail", 400);
         }
       }
-
-      const fileName = uuidv4() + path.extname(file.originalname);
-      const filePath = path.join(
-        __dirname,
-        "..",
-        "uploads/thumbnail",
-        fileName
-      );
-
-      await fs.writeFile(filePath, file.buffer);
-
-      updatedFields.thumbnail = fileName;
     }
+
+    const ext = "jpeg";
+    const fileName = `${uuidv4()}.${ext}`;
+
+    const gcsFile = thumbnailsBucket.file(fileName);
+
+    await gcsFile.save(buffer, {
+      contentType: "image/jpeg",
+      resumable: false,
+    });
+
+    const publicUrl = `https://storage.googleapis.com/${thumbnailsBucket.name}/${gcsFile.name}`;
+    updatedFields.thumbnail = publicUrl;
   }
 
   const updatedPost = await Post.findByIdAndUpdate(
@@ -217,17 +221,14 @@ const deletePost = async (req, res) => {
   }
 
   if (postToDelete.thumbnail) {
-    const filePath = path.join(
-      __dirname,
-      "..",
-      "uploads/thumbnail",
-      postToDelete.thumbnail
-    );
+    const fileName = postToDelete.thumbnail.split("/").pop();
+    const oldFile = thumbnailsBucket.file(fileName);
+
     try {
-      await fs.unlink(filePath);
-    } catch (err) {
-      if (err.code !== "ENOENT") {
-        httpError("Failed to delete post thumbnail", 400);
+      await oldFile.delete();
+    } catch (error) {
+      if (error.code !== 404) {
+        httpError("Failed to delete thumbnail", 400);
       }
     }
   }

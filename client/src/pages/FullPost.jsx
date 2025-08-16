@@ -57,16 +57,12 @@ const FullPost = () => {
                 to={`/posts/users/${post.user._id}`}
                 className="flex items-start gap-5 min-w-0 text-[#333] hover:text-[#548EAA] transition-colors duration-300 ease-in-out"
               >
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden">
-                  <img
-                    src={
-                      post.user.avatar
-                        ? `/uploads/avatar/${post.user.avatar}`
-                        : noAvatar
-                    }
-                    alt={post.user.username}
-                  />
-                </div>
+                <img
+                  src={post.user.avatar ? post.user.avatar : noAvatar}
+                  alt={post.user.username}
+                  className=" w-10 h-10 rounded-full object-cover flex-shrink-0"
+                />
+
                 <div className="max-w-3xs md:max-w-[80%] truncate">
                   <h5 className="text-sm font-semibold truncate">
                     By: {post.user.username}
@@ -97,7 +93,7 @@ const FullPost = () => {
 
             {/* Post thumbnail*/}
             <img
-              src={`/uploads/thumbnail/${post.thumbnail}`}
+              src={post.thumbnail}
               alt="Blog thumbnail"
               className="my-10 mx-auto"
             />

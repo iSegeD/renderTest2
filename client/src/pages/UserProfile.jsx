@@ -56,10 +56,11 @@ const UserProfile = () => {
     const result = await dispatch(changeUserAvatar(formData));
 
     if (result.success) {
+      await dispatch(getUserById(id));
       setNewAvatar(null);
-      dispatch(getUserById(id));
     }
     setNewAvatar(null);
+    
   };
 
   const handleEditSubmit = async (e) => {
@@ -118,7 +119,7 @@ const UserProfile = () => {
                 newAvatar
                   ? URL.createObjectURL(newAvatar)
                   : avatarFromServer
-                  ? `/uploads/avatar/${avatarFromServer}`
+                  ? avatarFromServer
                   : noAvatar
               }
               alt={currentUser.name}

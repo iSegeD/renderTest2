@@ -75,16 +75,12 @@ const Comments = ({ post }) => {
           <div className="flex items-center justify-between mb-5">
             {/*  Left part: avatar, name and time  */}
             <div className="flex items-start gap-3 min-w-0 ">
-              <div className="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden">
-                <img
-                  src={
-                    item.user.avatar
-                      ? `/uploads/avatar/${item.user.avatar}`
-                      : noAvatar
-                  }
-                  alt={item.user.username}
-                />
-              </div>
+              <img
+                src={item.user.avatar ? item.user.avatar : noAvatar}
+                alt={item.user.username}
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0"
+              />
+
               <div className="flex flex-col min-w-0 pr-5">
                 <h5 className="font-semibold text-xs sm:text-base truncate">
                   {item.user.username}

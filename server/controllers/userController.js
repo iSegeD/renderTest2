@@ -1,13 +1,14 @@
 import bcrypt from "bcrypt";
 import User from "../models/userModel.js";
 
+import sharp from "sharp";
+
 import { httpError } from "../utils/httpErrorHelper.js";
 
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { avatarsBucket } from "../config/googleStorage.js";
+import { v4 as uuidv4 } from "uuid";
+
+const MAX_AVATAR_SIZE = 500 * 1024;
 
 // ================= GET USERS =================
 // GET: api/users/authors
@@ -41,35 +42,50 @@ const changeAvatar = async (req, res) => {
     httpError("Please upload a profile avatar", 400);
   }
 
-  if (file.size > 500 * 1024) {
-    httpError("Profile picture is too large. Maximum size is 500KB", 400);
+  const buffer = await sharp(file.buffer).jpeg({ quality: 90 }).toBuffer();
+
+  if (buffer.length > MAX_AVATAR_SIZE) {
+    httpError("Profile picture is too large after processing (max 500KB)", 400);
   }
 
   const user = await User.findById(req.userId);
 
+  if (!user) {
+    httpError("User not found", 404);
+  }
+
   if (user.avatar) {
-    const oldPath = path.join(__dirname, "..", "uploads/avatar", user.avatar);
+    const fileName = user.avatar.split("/").pop();
+    const oldFile = avatarsBucket.file(fileName);
 
     try {
-      await fs.unlink(oldPath);
-    } catch (err) {
-      if (err.code === "ENOENT") {
-        console.warn(
-          "The file was manually deleted, but the express won't go down"
-        );
-      } else {
-        httpError("Failed to update old profile picture", 400);
+      await oldFile.delete();
+    } catch (error) {
+      if (error.code !== 404) {
+        httpError("Failed to delete old avatar", 400);
       }
     }
   }
 
-  const updatedAvatar = await User.findByIdAndUpdate(
+  const ext = "jpeg";
+  const fileName = `${uuidv4()}.${ext}`;
+
+  const gcsFile = avatarsBucket.file(fileName);
+
+  await gcsFile.save(buffer, {
+    contentType: "image/jpeg",
+    resumable: false,
+  });
+
+  const publicUrl = `https://storage.googleapis.com/${avatarsBucket.name}/${gcsFile.name}`;
+
+  const uploadedUser = await User.findByIdAndUpdate(
     req.userId,
-    { avatar: file.filename },
+    { avatar: publicUrl },
     { new: true }
   );
 
-  res.status(200).json(updatedAvatar);
+  res.status(200).json(uploadedUser);
 };
 
 // ================= EDIT USER DETAILS =================

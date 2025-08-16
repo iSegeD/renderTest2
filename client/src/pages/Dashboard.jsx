@@ -45,7 +45,7 @@ const Dashboard = () => {
             return (
               <div key={id} className="p-4 bg-white rounded shadow-lg">
                 <img
-                  src={`/uploads/thumbnail/${thumbnail}`}
+                  src={thumbnail}
                   alt={title}
                   className="rounded"
                 />

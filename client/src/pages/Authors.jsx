@@ -32,7 +32,7 @@ const Authors = () => {
                 className="p-4 rounded shadow-sm hover:shadow-lg transition duration-300 ease-in-out bg-white"
               >
                 <img
-                  src={avatar ? `/uploads/avatar/${avatar}` : noAvatar}
+                  src={avatar ? avatar : noAvatar}
                   alt={username}
                   className="mx-auto w-24 h-24 rounded-full object-cover"
                 />
